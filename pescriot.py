@@ -2,8 +2,6 @@ import requests
 from costanti_api_riot import *
 from datetime import datetime
 import tzlocal  # $ pip install tzlocal
-import cassiopeia as cass
-import time
 
 playerInfo = ""
 matchesIdOfPlayer = ""

@@ -9,6 +9,7 @@ creds = ServiceAccountCredentials.from_json_keyfile_name("creds.json", scope)
 sheets = build('sheets', 'v4', credentials=creds)
 drive = build('drive', 'v3', credentials=creds)
 
+
 def creaFoglio(title, carica=True):
     spreadsheet = {
         'properties': {
