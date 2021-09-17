@@ -51,7 +51,7 @@ def apriFoglio(nome):
     return drive.files().get(fileId=getIdFoglioFromName(nome)).execute()
 
 
-def appendiRigheFoglio(name, righe, inputType="USER_ENTERED", my_range="Sheet1!A1"):
+def appendiRigheFoglio(name, righe, inputType="USER_ENTERED", my_range="Team Stats!A1"):
     id = getIdFoglioFromName(name)
     return sheets.spreadsheets().values().append(spreadsheetId=id,
                                                  range=my_range, valueInputOption=inputType,

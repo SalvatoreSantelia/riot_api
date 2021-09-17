@@ -1,16 +1,17 @@
 import random
 import costanti_api_riot
-import cassiopeia as cass
-from cassiopeia import Summoner, Match
-from cassiopeia.data import Season, Queue
 from collections import Counter
 import requests
+import cassiopeia as cass
 import pprint
 from costanti_api_riot import *
-
+from datetime import datetime, timedelta
+import time
+from pytz import timezone
 global match_info
 global match_info_riot_API
 global match_timeline
+global fbVictimName
 
 
 def getMatchInfoById(id):
@@ -19,12 +20,19 @@ def getMatchInfoById(id):
     match_info_riot_API = response
 
 
-def getParticipants():
+def getParticipants(team_player):
     players = []
+    side = ''
     for player in match_info.participants:
-        players.append(player)
-        if len(players) >= 5:
+        if team_player in player or team_player == player:
+            players.append(player)
+            side = player.side
             break
+    for player in match_info.participants:
+        if player.side == side and player not in players:
+            players.append(player)
+            if len(players) >= 5:
+                break
     return players
 
 
@@ -67,7 +75,9 @@ def getDurationGame():
 
 def getDate():
     global match_info
-    return str(match_info.creation.datetime)[:19]
+    fmt = "%Y-%m-%d %H:%M:%S"
+    now_berlin = match_info.creation.naive.astimezone(timezone('Europe/Rome'))
+    return now_berlin.strftime(fmt)
 
 
 def getTeamBans(player):
@@ -134,7 +144,7 @@ def getKDA(player):
 
 
 def getCS(player):
-    return player.stats.total_minions_killed
+    return player.stats.total_minions_killed + player.stats.neutral_minions_killed
 
 
 def getTotalGold(player):
@@ -158,7 +168,26 @@ def getTimeCCOthers(player):
 
 
 def getFirstBloodAssist(player):
-    return player.stats.first_blood_assist
+    return str(player.stats.first_blood_assist).upper()
+
+
+# recupero player che ha timestamp minore su morti
+def getFirstBloodVictimName():
+    global fbVictimName
+    allParticipants = match_info.participants
+    fbVictimName = allParticipants[0]
+    for participant in allParticipants:
+        if len(participant.timeline.champion_deaths) >= 1:
+            if participant.timeline.champion_deaths[0].timestamp < fbVictimName.timeline.champion_deaths[0].timestamp:
+                fbVictimName = participant
+
+
+def getFirstBloodVictim(name):
+    global fbVictimName
+    if name == fbVictimName.summoner.name:
+        return "TRUE"
+    else:
+        return "FALSE"
 
 
 def getSoloKills(player):
@@ -211,39 +240,63 @@ def getGoldParticipation(player):
 
 def getCS15(player):
     # recupero minion a 15 minuti
-    first_slice = player.timeline.creeps_per_min_deltas['10-20'] * 5  # minion medi al minuto dal min 10 a 20
+    first_slice = 0
+    t = datetime.strptime("00:20:00", "%H:%M:%S")
+    delta = timedelta(hours=t.hour, minutes=t.minute, seconds=t.second)
+    if match_info.duration >= delta:
+        first_slice = player.timeline.creeps_per_min_deltas['10-20'] * 10  # minion medi al minuto dal min 10 a 20
     second_slice = player.timeline.creeps_per_min_deltas['0-10'] * 10  # minion medi al minuto dal min 0 al min 10
     return first_slice + second_slice
 
 
 def getCSDiffDeltas(player):
     value_to_return = 0
-    if isinstance(player.timeline.cs_diff_per_min_deltas['10-20'], float):
-        value_to_return = "{:0.2f}".format(player.timeline.cs_diff_per_min_deltas['10-20'])
-    else:
-        value_to_return = player.timeline.cs_diff_per_min_deltas['10-20']
+    for enemy_player in player.enemy_team.participants:
+        if getLaneOfPlayer(enemy_player) == getLaneOfPlayer(player):
+            t = datetime.strptime("00:20:00", "%H:%M:%S")
+            delta = timedelta(hours=t.hour, minutes=t.minute, seconds=t.second)
+            if match_info.duration >= delta:
+                value_to_return = player.timeline.creeps_per_min_deltas['10-20'] - \
+                                  enemy_player.timeline.creeps_per_min_deltas['10-20']
+            else:
+                value_to_return = player.timeline.creeps_per_min_deltas['0-10'] - \
+                                  enemy_player.timeline.creeps_per_min_deltas['0-10']
     return value_to_return
 
 
 def getXP15(player):
+    first_slice = 0
     # recupero minion a 15 minuti
-    first_slice = player.timeline.xp_per_min_deltas['10-20'] * 5  # minion medi al minuto dal min 10 a 20
+    t = datetime.strptime("00:20:00", "%H:%M:%S")
+    delta = timedelta(hours=t.hour, minutes=t.minute, seconds=t.second)
+    if match_info.duration >= delta:
+        first_slice = player.timeline.xp_per_min_deltas['10-20'] * 10  # minion medi al minuto dal min 10 a 20
     second_slice = player.timeline.xp_per_min_deltas['0-10'] * 10  # minion medi al minuto dal min 0 al min 10
     return first_slice + second_slice
 
 
 def getXPDiffDeltas(player):
     value_to_return = 0
-    if isinstance(player.timeline.xp_diff_per_min_deltas['10-20'], float):
-        value_to_return = "{:0.2f}".format(player.timeline.xp_diff_per_min_deltas['10-20'])
-    else:
-        value_to_return = player.timeline.xp_diff_per_min_deltas['10-20']
+    for enemy_player in player.enemy_team.participants:
+        if getLaneOfPlayer(enemy_player) == getLaneOfPlayer(player):
+            t = datetime.strptime("00:20:00", "%H:%M:%S")
+            delta = timedelta(hours=t.hour, minutes=t.minute, seconds=t.second)
+            if match_info.duration >= delta:
+                value_to_return = player.timeline.xp_per_min_deltas['10-20'] - \
+                                  enemy_player.timeline.xp_per_min_deltas['10-20']
+            else:
+                value_to_return = player.timeline.xp_per_min_deltas['0-10'] - \
+                                  enemy_player.timeline.xp_per_min_deltas['0-10']
     return value_to_return
 
 
 def getGold15(player):
     # recupero minion a 15 minuti
-    first_slice = player.timeline.gold_per_min_deltas['10-20'] * 5  # minion medi al minuto dal min 10 a 20
+    first_slice = 0
+    t = datetime.strptime("00:20:00", "%H:%M:%S")
+    delta = timedelta(hours=t.hour, minutes=t.minute, seconds=t.second)
+    if match_info.duration >= delta:
+        first_slice = player.timeline.gold_per_min_deltas['10-20'] * 10  # minion medi al minuto dal min 10 a 20
     second_slice = player.timeline.gold_per_min_deltas['0-10'] * 10  # minion medi al minuto dal min 0 al min 10
     return first_slice + second_slice
 
@@ -252,12 +305,14 @@ def getGoldDiffDeltas(player):
     value_to_return = 0
     for enemy_player in player.enemy_team.participants:
         if getLaneOfPlayer(enemy_player) == getLaneOfPlayer(player):
-            if isinstance(player.timeline.cs_diff_per_min_deltas['10-20'], float):
-                value_to_return = "{:0.2f}".format(player.timeline.gold_per_min_deltas['10-20'] -
-                                                   enemy_player.timeline.gold_per_min_deltas['10-20'])
-            else:
-                value_to_return = player.timeline.cs_diff_per_min_deltas['10-20'] - \
+            t = datetime.strptime("00:20:00", "%H:%M:%S")
+            delta = timedelta(hours=t.hour, minutes=t.minute, seconds=t.second)
+            if match_info.duration >= delta:
+                value_to_return = player.timeline.gold_per_min_deltas['10-20'] - \
                                   enemy_player.timeline.gold_per_min_deltas['10-20']
+            else:
+                value_to_return = player.timeline.gold_per_min_deltas['0-10'] - \
+                                  enemy_player.timeline.gold_per_min_deltas['0-10']
     return value_to_return
 
 
@@ -421,7 +476,10 @@ def getSixthRune(player):
 
 
 def getWard(player):
-    return "Ward"
+    if player.stats.items[6] is not None:
+        return IMAGE_PREFIX.format(player.stats.items[6].image.url)
+    else:
+        return ""
 
 
 def checkStatName(name):
@@ -498,7 +556,7 @@ def makeRowForMatch(player):
             getDate(),
             getTeamBans(player),
             getEnemyTeamBans(player),
-            player.side.name,
+            str(player.side.name),
             getResult(player),
             getOpponentSummoner(player),
             getOpponentChampion(player),
@@ -514,7 +572,7 @@ def makeRowForMatch(player):
             getTotalVisionScore(player),
             getTimeCCOthers(player),
             getFirstBloodAssist(player),
-            "False?",
+            getFirstBloodVictim(player.summoner.name),
             getSoloKills(player),
             getSoloDeaths(player),
             getKillParticipation(player),
@@ -554,20 +612,21 @@ def makeRowForMatch(player):
             ]
 
 
-def makeRowsOfMatch(game_id):
+def makeRowsOfMatch(game_id,team_player):
     global match_info
     cass.set_riot_api_key(API)  # This overrides the value set in your configuration/settings.
     cass.set_default_region("EUW")
     match_info = cass.get_match(int(game_id), 'EUW')
     getMatchInfoById("EUW1_" + game_id)
     getMatchTimelineInfoById("EUW1_" + game_id)
-    players = getParticipants()
+    getFirstBloodVictimName()
+    players = getParticipants(team_player)
     rows = [makeRowForMatch(player) for player in players]
     return [e for e in rows]
 
 
 if __name__ == "__main__":
-    makeRowsOfMatch("5454525634")
+    makeRowsOfMatch("5370217442")
 
 # p = match_info.participants[0]
 # ban = match_info.teams

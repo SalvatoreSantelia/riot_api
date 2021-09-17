@@ -1,5 +1,5 @@
-API_KEY = "api_key=RGAPI-70379c7e-e520-4c2b-b279-8ea1f7d8725b"
-API = "RGAPI-70379c7e-e520-4c2b-b279-8ea1f7d8725b"
+API_KEY = "api_key=RGAPI-914fa27e-f52b-4c7d-a2c2-3ca5808f217d"
+API = "RGAPI-914fa27e-f52b-4c7d-a2c2-3ca5808f217d"
 # query
 SUMMONER = "https://euw1.api.riotgames.com/lol/summoner/v4/summoners/by-name/{0}?" + API_KEY
 MATCHES_ID_BY_PUUID = "https://europe.api.riotgames.com/lol/match/v5/matches/by-puuid/{0}/ids?start={1}&count={2}&" + API_KEY
